@@ -1,0 +1,55 @@
+<html>
+    <head>
+        <script type="text/javascript">
+            // --> {"func": "<PROCEDURE_NAME>", "id": <ID>, "payload": {<DICTIONARY>}}
+            // <-- {"parent": "<DOM-PARENT-ELEMENT>", "id": <ID>, "html": "<HTML>"}
+
+            let socket = new WebSocket("ws://localhost:8765");
+            function codeAddress() {
+                console.log("Starting HTMLoWS Client");
+                socket.onopen = function (event) {
+                    loadContent('MAIN');
+                };
+            }
+            socket.onmessage = function (event) {
+                console.log("<-- " + event.data);
+                rec_msg = JSON.parse(event.data);
+                var dom_elem = document.getElementById(rec_msg.parent).innerHTML = rec_msg.html;
+                return false;
+            }
+
+
+            function isOpen(ws) {
+                return ws.readyState === ws.OPEN
+            }
+
+            function loadContent(func, opts = {}){
+                var payload = {};
+                console.log("Optional parameter: " + JSON.stringify(opts));
+                if('ids' in opts){
+
+                    for(var id in opts['ids']){
+                        console.log("Get element from: " + opts['ids'][id]);
+                        payload[opts['ids'][id]] = document.getElementById(opts['ids'][id]).value;
+                    }
+                }
+                var msg = {
+                    "func": func,
+                    "id": Date.now(),
+                    "payload": payload
+                }
+                console.debug('--> ' + JSON.stringify(msg));
+                if (!isOpen(socket)) return;
+                socket.send(JSON.stringify(msg));
+                return false;
+            }
+
+            window.onload = codeAddress;
+        </script>
+    </head>
+    <body>
+        <div id="root">
+            First Container sonstiges dies das da...
+        </div>
+    </body>
+</html>

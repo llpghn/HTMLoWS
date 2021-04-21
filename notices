@@ -1,0 +1,50 @@
+---- ---- ---- ----
+    'html': '<div id="romeo">Hello Holy Molly.<div id="liste"></div></div>'
+    '<div id="romeo">Hello Holy Molly.{{Liste}}</div>'
+
+---- ---- ---- ----
+    Wie lade ich den eine Seite das erste mal?
+    Ich rufe meine Main-View auf... in der würde ich nun gerne dann noch einen ersten Inhalt anzeigen...
+
+---- ---- ---- ----
+    Problem mit Python Websocket...
+    - Ich brauche zwei Libraries um HTTP und WebSocket zu behandeln.
+        Lösung: Aufbauen des WebSockets über die Sockets-Programmieren
+                Da man zuerst dann einen normalen HTTP-Request macht, baut man einen Socket auf.
+                Bevor man dann über diese Verbindung kann man dann.
+
+        Raw-Verbindung...
+            ... /GET/main
+            ... danach dann der Websocket verbindung.
+
+---- ---- ---- ----
+    ### Anfrage für den Handshake
+    GET / HTTP/1.1
+    Host: localhost:8765
+    Connection: Upgrade
+    Pragma: no-cache
+    Cache-Control: no-cache
+    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36
+    Upgrade: websocket
+    Origin: http://localhost:8000
+    Sec-WebSocket-Version: 13
+    Accept-Encoding: gzip, deflate, br
+    Accept-Language: de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7
+    Cookie: Pycharm-d3cd5da7=245d06db-0803-49d4-b54b-9f7429c0be82
+    Sec-WebSocket-Key: ATfikXxj3s8Pb+vXv5NRLQ==
+    Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+
+---- ---- ---- ----
+    Wiederverwendung                   vs.          Neuer Socket?
+    =====================================================================================
+    - Nur ein Funktionsaufruf                       - Zweimal eine Verbindungsaufbau
+    - Komplexes JS Handling                         - Nutzung Standard JS
+                                                    - Saubere Trennung im Server
+
+---- ---- ---- ----
+    Wie gehe ich damit um wenn, wenn ein Packet nun kein FIN hat und fragmentiert ist?
+    Nachdem man ein Packet erhalten halt, speichert man dieses Packet ab und danach prüft der Server dann was zu tun ist:
+        1. FIN == 1
+            Fertiges Packet. Informiere nun den übergeordnete Komponente.
+        2. FIN == 0 // Continuation Packet == 1
+            Für den Client muss ein Packet gespeichert sein, hier kann man nun den Text anhängen
