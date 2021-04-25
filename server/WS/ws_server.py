@@ -7,6 +7,7 @@ import hashlib # Used in create websocket upgrade message
 import base64 # Used in create websocket upgrade message
 
 from server.WS.ws_rec_msg import WSRecMessage
+from server.WS.LogicProcessor.LogicProcessor import LogicProcessor
 
 class WSServer():
     def __init__(self, logger, configuration):
@@ -26,6 +27,8 @@ class WSServer():
             Von diesem wird dann die Methode handle auferufen. """
         self.logic_processor = processor
 
+
+
     def start_listen(self):
         """ Beginnt das lauschen auf Daten auf den entsprechenden Port und bearbeitet dann die Daten. """
         while True:
@@ -36,6 +39,8 @@ class WSServer():
                 if self.transaction_id > 99:
                     self.transaction_id = 0
 
+                response = None
+                frame = None
                 # Behandle die Socket-Änderung
                 if s is self.socket:
                     # Bearbeite neue Verbindungsanfragen von Clients
@@ -49,9 +54,11 @@ class WSServer():
                     })
                 else:
                     self.logger.debug(str(self.transaction_id) + " Receiving Message from " + str(s))
+
+                    # Lesen der Nachricht
                     frame = s.recv(self.configuration['mtu'])
 
-                    # Finde den index für den zu behandelnenden Index um den es sich handelt.
+                    # START: Finde den index für den zu behandelnenden Index um den es sich handelt.
                     index_of_current_socket = -1
                     idx = 0
                     for cs in self.client_sockets:
@@ -61,6 +68,7 @@ class WSServer():
                         idx += 1
                     self.logger.debug(str(self.transaction_id) + " Found Socket at index: " + str(index_of_current_socket))
                     self.logger.debug(str(self.transaction_id) + " \tSocket-Level: " + self.client_sockets[index_of_current_socket]['level'])
+                    # ENDE
 
                     # Bearbeite den Socket abhängig vom Status HTTP oder WS
                     # Neuer TCP Socket mit HTTP Protokoll
@@ -86,25 +94,52 @@ class WSServer():
                         ws_rec_msg = WSRecMessage()
                         ws_rec_msg.set_frame(frame)
                         ws_rec_msg.frame_to_msg()
+                        res = None
 
-                        # Handle message received by client
-                        if ws_rec_msg.is_fin() == True:
-                            self.logic_processor.handle(ws_rec_msg, self.client_sockets[index_of_current_socket]['raddr'])
-
-                        # print("Closing Socket " + str(wsmsg.get_payload_len_as_int()))
-                        s.close()
-                        self.socket_read_list.remove(s)
-
-                        #if frame:
-                        #    s.send(frame)
-                        #else:
-                        #    s.close()
-                        #    self.socket_read_list.remove(s)
+                        # Behandlung der Standardnachrichten
+                        if ws_rec_msg.is_ping_frame():
+                            self.logger.debug("Received Ping - Sending Pong")
 
 
-            # client.send(self.get_response_msg(rec_data.decode("utf-8")))
+                        elif ws_rec_msg.is_connection_close_frame():
+                            self.logger.debug("Received Connection Closed")
+                            s.close()
+                            self.socket_read_list.remove(s)
+                            continue
+                        else:
+                            # Normale Behandlung von Nachrichten, da kein Standardnachricht
+                            if ws_rec_msg.is_fin() is not True:
+                                # Die Nachricht ist nicht die letzte, also müssen wir diese nun Zwischenspeichern
+                                if self.client_sockets[index_of_current_socket]['msg'] is None:
+                                    # Das Clientelement hat noch keine Nachricht gespeichert daher speichern wir
+                                    # nun die Nachricht für diesen Client zwischen.
+                                    self.client_sockets[index_of_current_socket]['msg'] = ws_rec_msg
+                                    continue
+                                else:
+                                    # Wir haben schon Daten zwischengespeichert, also müssen wir die Daten die wir
+                                    # nun erhalten haben an die Zwischengespeicherten Daten anhängen
+                                    self.client_sockets[index_of_current_socket]['msg'].append_data(ws_rec_msg.data)
+                                    continue
+                            else:
+                                # Wir haben die letzte Nachricht erhalten, wir können die Nachricht nun bearbeiten
+                                if self.client_sockets[index_of_current_socket]['msg'] is None:
+                                    # Die ganze Nachricht passte in einem Frame, die kann nun behandelt werden.
+                                    res = WSRecMessage()
+                                    res.set_msg(self.logic_processor.handle(ws_rec_msg))
+                                    self.client_sockets[index_of_current_socket]['msg'] = None
+                                else:
+                                    self.client_sockets[index_of_current_socket]['msg'].append_data(ws_rec_msg.data)
+                                    self.client_sockets[index_of_current_socket]['msg'].set_fin()
+                                    res = WSRecMessage()
+                                    res.set_msg(self.logic_processor.handle(self.client_sockets[index_of_current_socket]['msg']))
+                                    self.client_sockets[index_of_current_socket]['msg'] = None
+                        if res is not None:
+                            s.send(res.get_frame())
+                            self.logger.debug("-- " + str(res.get_frame()))
+                            continue
 
-            # client.close()
+                            # Es wurde eine Nachricht ermittelt die nun gesendet werden muss
+
 
 
 
@@ -141,5 +176,8 @@ if __name__ == "__main__":
     logger.info("Start Websocket-Server")
     logger.info("Working directory: " + str(os.getcwd()))
     server = WSServer(logger, {'interface' : 'localhost', 'port': 8765, 'mtu': 1500})
+    lp = LogicProcessor()
+    server.set_logic_processor(lp)
+    lp.set_ws_server(server)
     server.start_listen()
     #print("Generated string for dGhlIHNhbXBsZSBub25jZQ==  -> " + server.generate_secure_token('dGhlIHNhbXBsZSBub25jZQ=='))

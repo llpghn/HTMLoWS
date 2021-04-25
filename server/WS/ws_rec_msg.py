@@ -42,12 +42,9 @@ class WSRecMessage():
         self.frame_as_bytes = frame_as_bytes
         return
 
-    def set_msg(self, fin, opcode, decoded_data):
-        self.FIN = fin
-        self.opcode = opcode
+    def set_msg(self, decoded_data):
         self.decoded_data = decoded_data
         return
-
 
     def frame_to_msg(self):
 
@@ -56,7 +53,6 @@ class WSRecMessage():
             return False
         print("Getting Frame of type: " + str(type(self.frame_as_bytes)))
         print("Number of Bytes: " + str(len(self.frame_as_bytes)))
-
 
         self.FIN =          (self.frame_as_bytes[0] & 0b10000000) >> 8
         self.opcode =       (self.frame_as_bytes[0] & 0b00001111)
@@ -112,6 +108,33 @@ class WSRecMessage():
         print("Decoded data: " + str(self.decoded_data))
         return True
 
+    def get_frame(self):
+        """ Liefert den Frame zum senden an den Client, sobald das Bytes-Objekt geliefert wird, werden auch die
+            anderen Parameter aktualisiert. Der Server muss daher nun schauen ob das Paket dann das FIN-Bit gesetzt
+            wurde."""
+
+        # Zuerst berechnen wie groß unsere Payload ist:
+        b = bytearray()
+        b.append(0x81)
+        msg_length = len(self.decoded_data)
+        print("Sendmessage-Length: " + str(msg_length))
+
+        if len(self.decoded_data) < 126:
+            # Kurzer Text
+            b.extend(msg_length.to_bytes(length=1, byteorder='big'))
+        if len(self.decoded_data) < 65535:
+            # Mittellanger Text
+            dl = 126
+            b.extend(dl.to_bytes(length=1, byteorder='big'))
+            b.extend(msg_length.to_bytes(length=2, byteorder='big'))
+            # Mittellanger Text
+        if len(self.decoded_data) < 2^64-1:
+            # Ganz langer Text
+            dl = 127
+            b.extend(dl.to_bytes(length=1, byteorder='big'))
+            b.extend(msg_length.to_bytes(length=8, byteorder='big'))
+        b.extend(str.encode(self.decoded_data))
+        return b
     def is_continuation_frame(self):
         """ Gibt die Information zurück ob das Packet eine fortführung von einem vorherigen Paket ist."""
         if self.opcode == 0:
@@ -135,3 +158,52 @@ class WSRecMessage():
             return True
         else:
             return False
+
+    def set_fin(self):
+        self.FIN = 1
+
+    def is_continuation_frame(self):
+        # x0 denotes continuation frame
+        if self.opcode == 0:
+            return True
+        else:
+            return False
+
+    def is_text_frame(self):
+        # x1 denotes a text frame
+        if self.opcode == 1:
+            return True
+        else:
+            return False
+
+    def is_binary_frame(self):
+        # x2 denotes a binary frame
+        if self.opcode == 2:
+            return True
+        else:
+            return False
+
+    def is_connection_close_frame(self):
+        # x8 denotes a connection close
+        if self.opcode == 8:
+            return True
+        else:
+            return False
+
+    def is_ping_frame(self):
+        # x9 denotes a ping
+        if self.opcode == 9:
+            return True
+        else:
+            return False
+
+    def is_pong_frame(self):
+        # xA denotes a pong
+        # Kann ignoriert werden, da wir hier einen Server haben
+        if self.opcode == 10:
+            return True
+        else:
+            return False
+
+    def append_data(self, data):
+        self.data += data

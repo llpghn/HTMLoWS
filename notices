@@ -48,3 +48,44 @@
             Fertiges Packet. Informiere nun den übergeordnete Komponente.
         2. FIN == 0 // Continuation Packet == 1
             Für den Client muss ein Packet gespeichert sein, hier kann man nun den Text anhängen
+
+
+
+
+
+
+
+
+
+            # Behandlung der Standardnachrichten
+                        if ws_rec_msg.is_ping_frame():
+                            self.logger.debug("Received Ping - Sending Pong")
+                        elif ws_rec_msg.is_connection_close_frame():
+                            self.logger.debug("Received Connection Closed")
+                        else:
+                            # Normale Behandlung von Nachrichten, da kein Standardnachricht
+                            if ws_rec_msg.is_fin() is not True:
+                                # Die Nachricht ist nicht die letzte, also müssen wir diese nun Zwischenspeichern
+                                if self.client_sockets[index_of_current_socket]['msg'] is None:
+                                    # Das Clientelement hat noch keine Nachricht gespeichert daher speichern wir
+                                    # nun die Nachricht für diesen Client zwischen.
+                                    self.client_sockets[index_of_current_socket]['msg'] = ws_rec_msg
+                                    return
+                                else:
+                                    # Wir haben schon Daten zwischengespeichert, also müssen wir die Daten die wir
+                                    # nun erhalten haben an die Zwischengespeicherten Daten anhängen
+                                    self.client_sockets[index_of_current_socket]['msg'].append_data(ws_rec_msg.data)
+                                    return
+                            else:
+                                # Wir haben die letzte Nachricht erhalten, wir können die Nachricht nun bearbeiten
+                                if self.client_sockets[index_of_current_socket]['msg'] is None:
+                                    # Die ganze Nachricht passte in einem Frame, die kann nun behandelt werden.
+                                    self.logic_processor.handle(ws_rec_msg,
+                                                                self.client_sockets[index_of_current_socket]['raddr'])
+                                    self.client_sockets[index_of_current_socket]['msg'] = None
+                                else:
+                                    self.client_sockets[index_of_current_socket]['msg'].append_data(ws_rec_msg.data)
+                                    self.client_sockets[index_of_current_socket]['msg'].set_fin()
+                                    self.logic_processor.handle(self.client_sockets[index_of_current_socket]['msg'],
+                                                                self.client_sockets[index_of_current_socket]['raddr'])
+                                    self.client_sockets[index_of_current_socket]['msg'] = None
